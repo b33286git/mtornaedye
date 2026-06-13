@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的財務總表 V1</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --sub:#6e6e73;
+    --line:#e5e5ea; --blue:#0071e3; --green:#34c759; --red:#ff3b30;
+    --yellow:#ff9500; --radius:18px; --shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang TC","Helvetica Neue",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 80px}
+  header{text-align:center;padding:24px 0 8px}
+  header h1{font-size:26px;font-weight:700;letter-spacing:-.5px}
+  header p{color:var(--sub);font-size:14px;margin-top:4px}
+  .toolbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+  .btn{border:none;background:var(--blue);color:#fff;padding:9px 16px;border-radius:980px;
+    font-size:14px;font-weight:600;cursor:pointer;transition:.2s}
+  .btn:hover{opacity:.85}
+  .btn.ghost{background:#fff;color:var(--blue);box-shadow:inset 0 0 0 1px var(--line)}
+  /* tabs */
+  .tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:18px 0 22px}
+  .tab{padding:9px 18px;border-radius:980px;background:#fff;color:var(--sub);
+    font-size:15px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);transition:.2s}
+  .tab.active{background:var(--ink);color:#fff}
+  /* 第一層大類選單 */
+  .groupTabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:18px 0 12px}
+  .gtab{padding:11px 26px;border-radius:980px;background:#fff;color:var(--sub);font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);transition:.2s;border:2px solid transparent}
+  .gtab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .gtab:hover{transform:translateY(-1px)}
+  .tabs{margin:0 0 22px}
+  .page{display:none;animation:fade .3s}
+  .page.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  /* cards */
+  .card{background:var(--card);border-radius:var(--radius);padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{font-size:19px;font-weight:700;margin-bottom:4px}
+  .card .desc{color:var(--sub);font-size:13px;margin-bottom:16px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:720px){
+    .g3,.g4{grid-template-columns:repeat(2,1fr)}
+    /* 手機：觸控目標放大、字級調整 */
+    .gtab{padding:10px 18px;font-size:15px}
+    .tab{padding:10px 16px;font-size:14px}
+    td select{padding:8px 4px;font-size:13px}
+    td input{padding:8px 7px;font-size:13px}
+    .btn{padding:11px 18px}
+    /* 配息月曆手機改 3 欄 */
+    #calGrid{grid-template-columns:repeat(3,1fr)!important}
+    /* 銀行帳戶輸入框手機不擠成一排 */
+    #bankBox > div{gap:6px!important}
+    #bankBox input,#bankBox select{font-size:14px!important}
+    /* 每月投入：手機改上下排，不再左右切半 */
+    .planGrid{grid-template-columns:1fr!important;gap:0!important}
+    .planGrid > div:last-child{margin-top:20px;padding-top:20px;border-top:2px solid var(--line)}
+  }
+  .stat{background:var(--bg);border-radius:14px;padding:16px}
+  .stat .lbl{font-size:12px;color:var(--sub);font-weight:600}
+  .stat .val{font-size:24px;font-weight:700;margin-top:4px;letter-spacing:-.5px}
+  .stat .sub{font-size:12px;color:var(--sub);margin-top:2px}
+  .val.green{color:var(--green)} .val.red{color:var(--red)} .val.yellow{color:var(--yellow)}
+  /* alert */
+  .alert{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+  .alert.red{background:#ffeceb;color:#c4271d} .alert.green{background:#e8f8ed;color:#1a7a36}
+  .alert.yellow{background:#fff4e5;color:#a85b00}
+  .alert b{font-weight:700}
+  /* bar */
+  .barwrap{margin:10px 0}
+  .barwrap .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:6px}
+  /* 五大類資產 — 數字疊在長條上 */
+  .catRow{margin:14px 0}
+  .catName{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+  .catBarBig{position:relative;height:24px;background:var(--line);border-radius:8px;overflow:hidden}
+  .catBarBig i{display:block;height:100%;border-radius:8px}
+  .catBarPct{position:absolute;top:0;left:10px;line-height:24px;font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .catTgtLine{position:absolute;top:-2px;width:3px;height:28px;background:#1d1d1f;opacity:.6;border-radius:2px}
+  .catSub{font-size:12px;color:var(--sub);margin-top:4px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600;font-size:12px;text-align:right;cursor:pointer;user-select:none}
+  th:first-child,td:first-child{text-align:left}
+  th.l,td.l{text-align:left}
+  tbody tr:hover{background:#fafafa}
+  tr.cat td{background:#f0f0f3;font-weight:700;color:var(--ink);font-size:13px}
+  td input{width:78px;border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:13px;text-align:right;font-family:inherit}
+  td input.name{width:96px;text-align:left}
+  td select{border:1px solid var(--line);border-radius:8px;padding:5px 4px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer}
+  td .act{display:inline-block;padding:6px 8px;font-size:15px;text-decoration:none;min-width:32px;text-align:center}
+  td input:focus{outline:none;border-color:var(--blue)}
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:980px;font-weight:600}
+  .tag.sell{background:#fff4e5;color:#a85b00}
+  .pill{font-size:11px;color:var(--sub)}
+  .lnk{color:var(--blue);text-decoration:none;font-size:12px}
+  .mini{font-size:11px;color:var(--sub)}
+  .right{text-align:right} .center{text-align:center}
+  .addrow{margin-top:12px}
+  #addForm input,#addForm select{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
+  .footer{text-align:center;color:var(--sub);font-size:12px;margin-top:30px}
+  details{margin-top:10px}
+  summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--blue)}
+  .recobox{background:var(--bg);border-radius:14px;padding:16px;margin-bottom:12px}
+  .recobox h3{font-size:15px;margin-bottom:8px}
+  .recobox ul{margin-left:18px;font-size:13px;color:#333}
+  .recobox li{margin-bottom:5px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;font-size:12px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>💼 我的財務總表</h1>
+    <p>第三版 · 完整財務總表 + 配息行事曆 + 筆記</p>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn" onclick="exportJSON()">⬇️ 匯出 JSON 備份</button>
+    <button class="btn ghost" onclick="document.getElementById('imp').click()">⬆️ 匯入資料</button>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(event)">
+    <button class="btn ghost" onclick="reloadFromFile()">🔄 重新載入 data.json</button>
+    <button class="btn ghost" onclick="resetData()">↺ 還原為空</button>
+  </div>
+  <div id="dataStatus" style="text-align:center;font-size:12px;color:var(--sub);margin:-6px 0 10px"></div>
+
+  <div class="groupTabs" id="groupTabs"></div>
+  <div class="tabs" id="subTabs"></div>
+
+  <!-- ============ 儀表板 ============ -->
+  <div class="page active" id="dash">
+    <div id="alerts"></div>
+    <div class="card">
+      <h2>資產總覽</h2>
+      <p class="desc">數字來自「庫存表」，修改庫存後這裡自動更新。匯率以 1 USD = <span id="fxShow"></span> TWD 計算。</p>
+      <div class="grid g4">
+        <div class="stat"><div class="lbl">總資產</div><div class="val" id="sTotal"></div><div class="sub" id="sCount"></div></div>
+        <div class="stat"><div class="lbl">年配息</div><div class="val green" id="sDiv"></div><div class="sub">每月約 <span id="sDivM"></span></div></div>
+        <div class="stat"><div class="lbl">整體殖利率</div><div class="val" id="sYield"></div><div class="sub">目標 4.5%</div></div>
+        <div class="stat"><div class="lbl">AAPL 集中度</div><div class="val" id="sAapl"></div><div class="sub">上限 15%</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>五大類資產配置</h2>
+      <p class="desc">彩色長條＝目前比例，黑色直線＝目標比例。一眼看出哪類要加碼、哪類要減碼。</p>
+      <div id="catBars"></div>
+      <div class="legend" id="catLegend"></div>
+    </div>
+
+    <div class="card">
+      <h2>月 3 萬現金流 · 達成進度</h2>
+      <p class="desc">目標：每月配息 30,000（年 360,000）。</p>
+      <div class="barwrap">
+        <div class="top"><span>目前每月 <b id="cfNow"></b></span><span>目標 30,000</span></div>
+        <div class="bar"><i id="cfBar" style="background:var(--green)"></i></div>
+      </div>
+      <p class="mini" id="cfNote" style="margin-top:8px"></p>
+    </div>
+  </div>
+
+  <!-- ============ 庫存表 ============ -->
+  <div class="page" id="inv">
+    <div class="card">
+      <h2>庫存表
+        <button class="btn ghost" id="editBtn" onclick="toggleEdit()" style="font-size:13px;padding:6px 14px;margin-left:8px">✏️ 編輯</button>
+        <button class="btn ghost" id="colBtn" onclick="toggleColPanel()" style="font-size:13px;padding:6px 14px;display:none">⚙️ 欄位</button>
+      </h2>
+      <p class="desc" id="invDesc">目前是<b>檢視模式</b>（防誤按）。點「✏️ 編輯」才能修改、排序、刪除、移動分類。看資產配置與賺賠就好。</p>
+      <div id="colPanel" style="display:none;background:var(--bg);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div class="mini" style="margin-bottom:8px;font-weight:600">勾選要顯示的欄位：</div>
+        <div id="colChecks" style="display:flex;flex-wrap:wrap;gap:12px"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="invTable">
+          <thead><tr id="invHead"></tr></thead>
+          <tbody id="invBody"></tbody>
+          <tfoot><tr id="invFoot" style="font-weight:700"></tr></tfoot>
+        </table>
+      </div>
+      <div class="addrow">
+        <button class="btn ghost" onclick="toggleAddForm()">＋ 新增一筆持股</button>
+        <div id="addForm" style="display:none;margin-top:12px;background:var(--bg);border-radius:14px;padding:14px">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <input id="af_n" placeholder="名稱" style="width:110px">
+            <input id="af_c" placeholder="代號" style="width:80px">
+            <select id="af_cat">${/*分類選項由JS填*/""}</select>
+            <select id="af_cur"><option value="TWD">TWD</option><option value="USD">USD</option></select>
+            <input id="af_p" type="number" inputmode="decimal" placeholder="價格" style="width:80px">
+            <input id="af_s" type="number" inputmode="decimal" placeholder="股數" style="width:80px">
+            <input id="af_d" type="number" inputmode="decimal" placeholder="每股配息" style="width:90px">
+            <button class="btn" onclick="confirmAdd()">加入</button>
+            <button class="btn ghost" onclick="toggleAddForm()">取消</button>
+          </div>
+        </div>
+      </div>
+      <p class="mini" style="margin-top:10px">💡 美股／美元計價基金，把「幣別」選 USD，系統會自動以匯率換算台幣。</p>
+      <details>
+        <summary>⚙️ 進階設定（匯率）</summary>
+        <div style="margin-top:10px">
+          美金匯率 1 USD =
+          <input type="number" inputmode="decimal" id="fxInput" step="0.01" style="width:90px" onchange="setFx(this.value)"> TWD
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ============ 每月投入計畫 ============ -->
+  <div class="page" id="plan">
+    <div class="card">
+      <h2>💰 每月投入計畫 <span class="pill">（現況 vs 建議）</span></h2>
+      <p class="desc">你每月投入約 6.2 萬。左邊是目前怎麼分，右邊是依「降低集中、補強配息與全球分散」的建議分配。可直接編輯金額。</p>
+      <div class="grid g2 planGrid" style="align-items:start">
+        <div>
+          <h3 style="font-size:15px;margin-bottom:10px">📍 目前每月投入</h3>
+          <div id="planNowBox"></div>
+          <div class="stat" style="margin-top:10px"><div class="lbl">目前每月合計</div><div class="val" id="planNowTotal"></div></div>
+        </div>
+        <div>
+          <h3 style="font-size:15px;margin-bottom:10px">🎯 建議每月投入</h3>
+          <div id="planSugBox"></div>
+          <div class="stat" style="margin-top:10px"><div class="lbl">建議每月合計</div><div class="val green" id="planSugTotal"></div></div>
+        </div>
+      </div>
+      <div class="recobox" style="margin-top:16px">
+        <h3>💡 動態調整建議（依五大類目標差距）</h3>
+        <p class="mini" style="margin-bottom:8px;color:var(--sub)">下方根據「目前比例 vs 目標比例」自動算出最需要調整的類別。差距越大、越優先處理。</p>
+        <div id="dynamicReco"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 轉換追蹤 ============ -->
+  <div class="page" id="conv">
+    <div class="card">
+      <h2>🔄 超額個股降階追蹤 <span class="pill">（半年賣一次 · 分 4 次）</span></h2>
+      <p class="desc">自動列出「單一持股 &gt; 門檻」的個股，幫你規劃降階。半年賣一次，漲跌都照賣，把情緒拿掉。</p>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--bg);border-radius:12px;padding:12px 14px;margin-bottom:14px">
+        <label class="mini" style="font-weight:600">集中度門檻：</label>
+        <input type="number" inputmode="decimal" id="concThreshold" min="5" max="50" step="1" style="width:70px" onchange="setThreshold(this.value)">
+        <span class="mini">%</span>
+        <span class="mini" style="color:var(--sub)">｜超過此比例的個股會自動列入追蹤</span>
+      </div>
+      <div id="convStocks"></div>
+    </div>
+    <div class="card">
+      <h2>🧹 零股清倉追蹤</h2>
+      <p class="desc">「待售」分類的零股，變現後轉入 ETF。從庫存表把賣掉的直接刪除即可，這裡顯示剩餘進度。</p>
+      <div class="barwrap">
+        <div class="top"><span>清倉進度</span><span id="sellPctText"></span></div>
+        <div class="bar"><i id="sellBar" style="background:var(--green)"></i></div>
+      </div>
+      <p class="mini" id="sellNote" style="margin-top:10px"></p>
+    </div>
+  </div>
+
+  <!-- ============ 目標追蹤 ============ -->
+  <div class="page" id="goal">
+    <div class="card">
+      <h2>📈 月 3 萬現金流 · 達成儀表</h2>
+      <p class="desc">目標：每月配息 30,000（年 360,000）。</p>
+      <div class="grid g3">
+        <div class="stat"><div class="lbl">目前每月配息</div><div class="val" id="goalNow"></div></div>
+        <div class="stat"><div class="lbl">達成率</div><div class="val" id="goalRate"></div></div>
+        <div class="stat"><div class="lbl">還差</div><div class="val yellow" id="goalGap"></div></div>
+      </div>
+      <div class="barwrap" style="margin-top:14px">
+        <div class="top"><span>現金流達成度</span><span>目標 30,000/月</span></div>
+        <div class="bar"><i id="goalBar" style="background:var(--green)"></i></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🗓️ 人生階段時間軸</h2>
+      <p class="desc">你的退休路線圖。目前 39 歲，正在「成長累積期」。</p>
+      <div id="timeline"></div>
+    </div>
+  </div>
+
+  <!-- ============ 配息行事曆 ============ -->
+  <div class="page" id="cal">
+    <div class="card">
+      <h2>📅 本月配息焦點</h2>
+      <p class="desc">這個月（<span id="calThisMonth"></span>月）有哪些股票配息、預計領多少。金額是用庫存表「每股配息×股數」÷配息次數估算。</p>
+      <div class="grid g3">
+        <div class="stat"><div class="lbl">本月配息檔數</div><div class="val" id="calMonthCount"></div></div>
+        <div class="stat"><div class="lbl">本月預估領取</div><div class="val green" id="calMonthAmt"></div></div>
+        <div class="stat"><div class="lbl">全年預估配息</div><div class="val" id="calYearAmt"></div></div>
+      </div>
+      <div id="calMonthList" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
+      <h2>🗓️ 全年配息月曆</h2>
+      <p class="desc">點任一月份看當月配息明細。下方藍色數字＝該月預估領取總額。</p>
+      <div id="calGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px"></div>
+      <div id="calDetail" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ 設定各股配息月份</h2>
+      <p class="desc">勾選每檔股票「哪幾個月」會配息（季配就勾 4 個月、月配勾 12 個月）。空著表示還沒設定。只列有配息的持股。</p>
+      <div id="calSetup"></div>
+    </div>
+  </div>
+
+  <!-- ============ 消費統計 ============ -->
+  <div class="page" id="spend">
+    <div class="card">
+      <h2>💳 每月現金流總覽</h2>
+      <p class="desc">財務總表的「現金流世界」：收入進來，扣掉投入與消費，剩下才是真結餘。可編輯下方數字。</p>
+      <div class="grid g4">
+        <div class="stat"><div class="lbl">月收入</div><div class="val" id="cfIncome"></div></div>
+        <div class="stat"><div class="lbl">月投入(買股)</div><div class="val" id="cfInvest"></div></div>
+        <div class="stat"><div class="lbl">月消費</div><div class="val" id="cfSpend"></div></div>
+        <div class="stat"><div class="lbl">月結餘</div><div class="val" id="cfRemain"></div></div>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center">
+        <label class="mini">月收入 <input type="number" inputmode="decimal" id="inIncome" style="width:100px" onchange="setFlow('income',this.value)"></label>
+        <label class="mini">月投入 <input type="number" inputmode="decimal" id="inInvest" style="width:100px" onchange="setFlow('invest',this.value)"></label>
+        <span class="mini">（月消費 = 下方各分類加總）</span>
+      </div>
+      <p class="mini" id="cfRate" style="margin-top:10px"></p>
+    </div>
+    <div class="card">
+      <h2>🧾 消費分類</h2>
+      <p class="desc">記錄每月各類花費，加總後就是月消費。可編輯金額、增減分類。</p>
+      <div id="spendBox"></div>
+      <button class="btn ghost" onclick="addSpend()" style="margin-top:12px">＋ 新增分類</button>
+      <div class="recobox" style="margin-top:16px">
+        <h3>💡 退休假設驗證</h3>
+        <ul>
+          <li>你預估退休後月生活費約 <b>3 萬</b>，記帳幾個月後就能驗證這個數字準不準。</li>
+          <li>若實際消費 &gt; 配息收入，代表還要再拉高殖利率或降低支出。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🏦 銀行 / 現金帳戶</h2>
+      <p class="desc">記錄各帳戶結餘：活存、定存、借貸利息收入等。加總成「現金總額」，方便對帳。每月對帳時更新數字即可。</p>
+      <div class="grid g2">
+        <div class="stat"><div class="lbl">現金總額（所有帳戶）</div><div class="val" id="bankTotal"></div></div>
+        <div class="stat"><div class="lbl">其中：定存</div><div class="val" id="bankFixed"></div></div>
+      </div>
+      <div id="bankBox" style="margin-top:14px"></div>
+      <button class="btn ghost" onclick="addBank()" style="margin-top:12px">＋ 新增帳戶</button>
+      <p class="mini" style="margin-top:10px">💡 「借貸」類型可記你借給貸款公司的本金/利息（業外收入來源）。這裡是「現金資產快照」，跟庫存表的股票分開記。</p>
+    </div>
+  </div>
+
+  <!-- ============ 建議與筆記 ============ -->
+  <div class="page" id="note">
+    <div class="card">
+      <h2>📌 我的投資原則</h2>
+      <p class="desc">把諮詢過程定案的決策固定下來，提醒自己「為什麼這樣做」，避免情緒下亂改。可編輯。</p>
+      <div id="principleBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>📝 自由筆記</h2>
+      <p class="desc">隨手記：想買什麼、觀察哪檔、財報心得、提醒事項… 點「＋ 新增筆記」。</p>
+      <button class="btn" onclick="addNote()">＋ 新增筆記</button>
+      <div id="noteBox" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="footer">資料僅存於本機瀏覽器，請定期「匯出 JSON 備份」。本表為個人規劃用途，非投資建議。</div>
+</div>
+
+<script>
+// ===== 預設資料（最小範例，僅作為 fallback；真實資料請放外部 data.json）=====
+const DEFAULT = {
+  fx: 31.6,
+  holdings: [
+    {n:"範例持股",c:"0000",cat:"短期",cur:"TWD",p:100,s:100,d:0,url:"",sell:false}
+  ],
+  planNow: [{n:"範例 ETF", amt:5000}],
+  planSug: [{n:"範例建議 ETF", amt:8000}],
+  flow: {income:50000, invest:20000},
+  spend: [
+    {n:"🍚 飲食",amt:8000},
+    {n:"🚗 交通",amt:3000},
+    {n:"🏥 醫療/保養",amt:2000},
+    {n:"🎮 娛樂/訂閱",amt:3000},
+    {n:"💡 其他",amt:4000}
+  ],
+  convDone: [false,false,false,false],
+  divMonths: { "00937B":[1,2,3,4,5,6,7,8,9,10,11,12] },
+  principles: [
+    "🎯 策略：請先把 data.json 放在同一資料夾，或點「⬆️ 匯入資料」載入你的備份。"
+  ],
+  notes: [
+    {date:"2026/06/11", text:"目前看到的是範例資料。請按「🔄 重新載入 data.json」或「⬆️ 匯入資料」取得真實資料。"}
+  ],
+  banks: [
+    {n:"範例帳戶", type:"活存", amt:0, note:""}
+  ]
+};
+const CAT_ORDER = ["短期","中期","全球ETF","股息ETF","成長","待售"];
+const CAT_LABEL = {"短期":"短期資產(現金+黃金)","中期":"中期資產(債券)","全球ETF":"長期-全球ETF","股息ETF":"長期-股息型台股ETF","成長":"長期-成長型ETF/個股","待售":"其他待售出個股"};
+const CAT_COLOR = {"短期":"#8e8e93","中期":"#5856d6","全球ETF":"#0071e3","股息ETF":"#34c759","成長":"#ff9500","待售":"#ff3b30"};
+// 目標配置比例（%）— 39-43歲成長期，可自行調整
+const TARGET = {"短期":10,"中期":10,"全球ETF":25,"股息ETF":30,"成長":25,"待售":0};
+let COLLAPSED = {}; // 各分類是否收合
+let EDIT = false;   // 編輯模式（預設唯讀，防誤按）
+// 欄位定義：key=資料欄, label=表頭, show=是否顯示, editOnly=只在編輯模式出現, calc=計算欄(不可編輯)
+let COLS = [
+  {key:"n",    label:"名稱",     show:true,  editOnly:false},
+  {key:"c",    label:"代號",     show:true,  editOnly:false},
+  {key:"p",    label:"價格",     show:true,  editOnly:false},
+  {key:"cur",  label:"幣別",     show:false, editOnly:true},
+  {key:"s",    label:"股數",     show:true,  editOnly:false},
+  {key:"cost", label:"成本",     show:true,  editOnly:false},
+  {key:"d",    label:"每股配息",  show:false, editOnly:false},
+  {key:"value",label:"現值",     show:true,  editOnly:false, calc:true},
+  {key:"pl",   label:"損益",     show:true,  editOnly:false, calc:true},
+  {key:"plpct",label:"報酬率",   show:true,  editOnly:false, calc:true},
+  {key:"pct",  label:"佔比",     show:true,  editOnly:false, calc:true},
+  {key:"yield",label:"殖利率",   show:true,  editOnly:false, calc:true},
+  {key:"cat",  label:"分類",     show:true,  editOnly:true},
+  {key:"url",  label:"連結",     show:false, editOnly:false},
+  {key:"act",  label:"操作",     show:true,  editOnly:true}
+];
+
+let DATA = load();
+
+function load(){
+  try{
+    const s=localStorage.getItem("finData");
+    if(s){
+      const d=JSON.parse(s);
+      // 相容舊版：補齊 V2 新欄位
+      if(!d.planNow) d.planNow=JSON.parse(JSON.stringify(DEFAULT.planNow));
+      if(!d.planSug) d.planSug=JSON.parse(JSON.stringify(DEFAULT.planSug));
+      if(!d.flow) d.flow=JSON.parse(JSON.stringify(DEFAULT.flow));
+      if(!d.spend) d.spend=JSON.parse(JSON.stringify(DEFAULT.spend));
+      if(!d.convDone) d.convDone=[false,false,false,false];
+      if(!d.divMonths) d.divMonths=JSON.parse(JSON.stringify(DEFAULT.divMonths));
+      if(!d.principles) d.principles=JSON.parse(JSON.stringify(DEFAULT.principles));
+      if(!d.notes) d.notes=JSON.parse(JSON.stringify(DEFAULT.notes));
+      if(!d.banks) d.banks=JSON.parse(JSON.stringify(DEFAULT.banks));
+      return d;
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+function save(){localStorage.setItem("finData",JSON.stringify(DATA));}
+function fmt(n){return Math.round(n).toLocaleString();}
+function val(h){return h.p*h.s*(h.cur==="USD"?DATA.fx:1);}
+function divOf(h){return h.d*h.s*(h.cur==="USD"?DATA.fx:1);}
+
+// ===== 渲染庫存表 =====
+// ===== 成本/損益計算 =====
+function costVal(h){ // 成本總額(TWD)
+  if(!h.cost||h.cost<=0) return null;
+  return h.cost*h.s*(h.cur==="USD"?DATA.fx:1);
+}
+function plOf(h){ // 損益金額
+  const c=costVal(h); if(c===null) return null;
+  return val(h)-c;
+}
+
+// ===== 動態欄位：哪些欄要顯示 =====
+function visibleCols(){
+  return COLS.filter(col=>col.show && (EDIT || !col.editOnly));
+}
+
+// ===== 渲染：庫存表（動態欄位 + 編輯模式 + 成本損益）=====
+function renderInv(){
+  const cols=visibleCols();
+  const total=DATA.holdings.reduce((a,h)=>a+val(h),0);
+  // 表頭
+  const head=document.getElementById("invHead");
+  head.innerHTML=cols.map(col=>{
+    const align=(col.key==="n"||col.key==="c"||col.key==="cat"||col.key==="act"||col.key==="url")?'class="l"':'';
+    const cls=(col.key==="cat"||col.key==="act"||col.key==="url")?'class="center"':align;
+    return `<th ${cls}>${col.label}</th>`;
+  }).join("");
+
+  const body=document.getElementById("invBody"); body.innerHTML="";
+  CAT_ORDER.forEach(cat=>{
+    const rows=DATA.holdings.map((h,i)=>({h,i})).filter(x=>x.h.cat===cat);
+    if(!rows.length) return;
+    const catVal=rows.reduce((a,x)=>a+val(x.h),0);
+    const isCol=COLLAPSED[cat];
+    const tr=document.createElement("tr"); tr.className="cat"; tr.style.cursor="pointer";
+    tr.onclick=()=>{COLLAPSED[cat]=!COLLAPSED[cat];renderInv();};
+    // 分類列：第一格 colspan 到「現值」前，現值格顯示小計
+    const valIdx=cols.findIndex(c=>c.key==="value");
+    const leftSpan=valIdx>=0?valIdx:cols.length;
+    let catRow=`<td class="l" colspan="${leftSpan}">${isCol?"▶":"▼"} ${CAT_LABEL[cat]} <span class="pill">(${rows.length})</span></td>`;
+    cols.slice(leftSpan).forEach(c=>{
+      if(c.key==="value") catRow+=`<td>${fmt(catVal)}</td>`;
+      else if(c.key==="pct") catRow+=`<td>${(catVal/total*100).toFixed(1)}%</td>`;
+      else catRow+=`<td></td>`;
+    });
+    tr.innerHTML=catRow;
+    body.appendChild(tr);
+    if(isCol) return;
+    rows.forEach(({h,i})=>{
+      const v=val(h), yld=v?divOf(h)/v*100:0;
+      const pl=plOf(h), c=costVal(h);
+      const plpct=(c&&c>0)?(pl/c*100):null;
+      const tr=document.createElement("tr");
+      tr.innerHTML=cols.map(col=>renderCell(col,h,i,v,yld,pl,plpct,total)).join("");
+      body.appendChild(tr);
+    });
+  });
+  // 總計列
+  const totDiv=DATA.holdings.reduce((a,h)=>a+divOf(h),0);
+  const totCost=DATA.holdings.reduce((a,h)=>{const c=costVal(h);return a+(c||0);},0);
+  const totPL=DATA.holdings.reduce((a,h)=>{const p=plOf(h);return a+(p||0);},0);
+  const foot=document.getElementById("invFoot");
+  const valIdx=cols.findIndex(c=>c.key==="value");
+  const leftSpan=valIdx>=0?valIdx:cols.length;
+  let footRow=`<td class="l" colspan="${leftSpan}">總計</td>`;
+  cols.slice(leftSpan).forEach(col=>{
+    if(col.key==="value") footRow+=`<td>${fmt(total)}</td>`;
+    else if(col.key==="pl"){const cls=totPL>=0?"green":"red";footRow+=`<td style="color:var(--${cls})">${totPL>=0?"+":""}${fmt(totPL)}</td>`;}
+    else if(col.key==="plpct"){const r=totCost>0?totPL/totCost*100:0;const cls=r>=0?"green":"red";footRow+=`<td style="color:var(--${cls})">${r>=0?"+":""}${r.toFixed(1)}%</td>`;}
+    else if(col.key==="pct") footRow+=`<td>100%</td>`;
+    else if(col.key==="yield") footRow+=`<td>${(totDiv/total*100).toFixed(2)}%</td>`;
+    else footRow+=`<td></td>`;
+  });
+  foot.innerHTML=footRow;
+
+  // 欄位設定面板
+  renderColChecks();
+  const fxI=document.getElementById("fxInput"); if(fxI) fxI.value=DATA.fx;
+}
+
+// 單格渲染
+function renderCell(col,h,i,v,yld,pl,plpct,total){
+  const ro=!EDIT; // 唯讀
+  switch(col.key){
+    case "n": return ro?`<td class="l">${h.n}</td>`:`<td class="l"><input class="name" value="${h.n}" onchange="upd(${i},'n',this.value,1)"></td>`;
+    case "c": return ro?`<td class="l">${h.c}</td>`:`<td class="l"><input class="name" style="width:60px" value="${h.c}" onchange="upd(${i},'c',this.value,1)"></td>`;
+    case "p": return ro?`<td>${h.p}</td>`:`<td><input type="number" inputmode="decimal" step="0.01" value="${h.p}" onchange="upd(${i},'p',this.value)"></td>`;
+    case "cur": return `<td><select onchange="upd(${i},'cur',this.value,1)"><option value="TWD" ${h.cur==="TWD"?"selected":""}>TWD</option><option value="USD" ${h.cur==="USD"?"selected":""}>USD</option></select></td>`;
+    case "s": return ro?`<td>${h.s}</td>`:`<td><input type="number" inputmode="decimal" step="0.0001" value="${h.s}" onchange="upd(${i},'s',this.value)"></td>`;
+    case "cost": return ro?`<td>${h.cost?h.cost:"—"}</td>`:`<td><input type="number" inputmode="decimal" step="0.01" value="${h.cost||""}" placeholder="—" onchange="upd(${i},'cost',this.value)"></td>`;
+    case "d": return ro?`<td>${h.d}</td>`:`<td><input type="number" inputmode="decimal" step="0.01" value="${h.d}" onchange="upd(${i},'d',this.value)"></td>`;
+    case "value": return `<td>${fmt(v)}</td>`;
+    case "pl": {
+      if(pl===null) return `<td>—</td>`;
+      const cls=pl>=0?"green":"red";
+      return `<td style="color:var(--${cls})">${pl>=0?"+":""}${fmt(pl)}</td>`;
+    }
+    case "plpct": {
+      if(plpct===null) return `<td>—</td>`;
+      const cls=plpct>=0?"green":"red";
+      let icon="";
+      if(plpct>=20) icon=' <span title="表現亮眼！">✨</span>';
+      else if(plpct<=-20) icon=' <span title="跌深，去看財報決定加碼或認賠">⚠️</span>';
+      return `<td style="color:var(--${cls})">${plpct>=0?"+":""}${plpct.toFixed(1)}%${icon}</td>`;
+    }
+    case "pct": return `<td>${(v/total*100).toFixed(2)}%</td>`;
+    case "yield": return `<td>${yld.toFixed(2)}%</td>`;
+    case "cat": {
+      const catOpts=CAT_ORDER.map(c=>`<option value="${c}" ${h.cat===c?"selected":""}>${c}</option>`).join("");
+      return `<td class="center"><select onchange="upd(${i},'cat',this.value,1)">${catOpts}</select></td>`;
+    }
+    case "url": return `<td class="center">${h.url?`<a class="lnk" href="${h.url}" target="_blank">查看</a>`:(EDIT?`<a class="lnk" href="#" onclick="setUrl(${i});return false">＋</a>`:"—")}</td>`;
+    case "act": return `<td class="center" style="white-space:nowrap">
+      <a class="lnk act" href="#" onclick="moveRow(${i},-1);return false" title="上移">▲</a>
+      <a class="lnk act" href="#" onclick="moveRow(${i},1);return false" title="下移">▼</a>
+      <a class="lnk act" href="#" onclick="delRow(${i});return false" title="刪除" style="color:var(--red)">🗑</a></td>`;
+    default: return `<td></td>`;
+  }
+}
+
+// 編輯模式切換
+function toggleEdit(){
+  EDIT=!EDIT;
+  document.getElementById("editBtn").textContent=EDIT?"✅ 完成":"✏️ 編輯";
+  document.getElementById("editBtn").style.background=EDIT?"var(--green)":"";
+  document.getElementById("editBtn").style.color=EDIT?"#fff":"";
+  document.getElementById("colBtn").style.display=EDIT?"inline-block":"none";
+  if(!EDIT) document.getElementById("colPanel").style.display="none";
+  document.getElementById("invDesc").innerHTML=EDIT
+    ? "<b>編輯模式</b>：可改數值、移動分類、▲▼排序、🗑刪除。點「⚙️ 欄位」選要顯示哪些欄。改完點「✅ 完成」回檢視模式。"
+    : "目前是<b>檢視模式</b>（防誤按）。點「✏️ 編輯」才能修改、排序、刪除、移動分類。看資產配置與賺賠就好。";
+  renderInv();
+}
+function toggleColPanel(){
+  const p=document.getElementById("colPanel");
+  p.style.display=p.style.display==="none"?"block":"none";
+}
+function renderColChecks(){
+  const box=document.getElementById("colChecks");
+  box.innerHTML=COLS.filter(c=>c.key!=="n").map((c)=>{
+    const idx=COLS.indexOf(c);
+    return `<label class="mini" style="display:flex;gap:4px;align-items:center"><input type="checkbox" ${c.show?"checked":""} onchange="toggleCol(${idx},this.checked)">${c.label}${c.editOnly?'<span style="color:var(--sub)">(編輯)</span>':''}</label>`;
+  }).join("");
+}
+function toggleCol(idx,v){COLS[idx].show=v;renderInv();}
+function upd(i,k,v,str){
+  DATA.holdings[i][k]= str? v : parseFloat(v)||0;
+  if(k==="cat"){DATA.holdings[i].sell = (v==="待售");}
+  save(); renderAll();
+}
+function moveRow(i,dir){
+  const arr=DATA.holdings, cur=arr[i], cat=cur.cat;
+  // 只在同分類內移動：找出同分類的相鄰項目交換
+  const sameIdx=arr.map((h,idx)=>idx).filter(idx=>arr[idx].cat===cat);
+  const pos=sameIdx.indexOf(i), tgt=pos+dir;
+  if(tgt<0||tgt>=sameIdx.length) return;
+  const j=sameIdx[tgt];
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  save(); renderInv();
+}
+function setUrl(i){const u=prompt("貼上查詢配息的網址：",DATA.holdings[i].url||"https://");if(u!==null){DATA.holdings[i].url=u;save();renderInv();}}
+function setFx(v){DATA.fx=parseFloat(v)||31.6;save();renderAll();}
+function toggleAddForm(){
+  const f=document.getElementById("addForm");
+  const show=f.style.display==="none";
+  f.style.display=show?"block":"none";
+  if(show){
+    // 填入分類下拉，預設用目前展開的第一個分類或「短期」
+    const sel=document.getElementById("af_cat");
+    sel.innerHTML=CAT_ORDER.map(c=>`<option value="${c}">${c}</option>`).join("");
+    document.getElementById("af_n").focus();
+  }
+}
+function confirmAdd(){
+  const g=id=>document.getElementById(id).value;
+  const n=g("af_n").trim()||"新持股";
+  const cat=g("af_cat");
+  DATA.holdings.push({
+    n, c:g("af_c").trim(), cat, cur:g("af_cur"),
+    p:parseFloat(g("af_p"))||0, s:parseFloat(g("af_s"))||0,
+    d:parseFloat(g("af_d"))||0, url:"", sell:(cat==="待售")
+  });
+  save();
+  ["af_n","af_c","af_p","af_s","af_d"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("addForm").style.display="none";
+  COLLAPSED[cat]=false; // 確保新增的分類是展開的
+  renderAll();
+}
+function delRow(i){if(confirm("確定刪除這筆？")){DATA.holdings.splice(i,1);save();renderAll();}}
+
+// ===== 渲染儀表板 =====
+function renderDash(){
+  const total=DATA.holdings.reduce((a,h)=>a+val(h),0);
+  const totDiv=DATA.holdings.reduce((a,h)=>a+divOf(h),0);
+  const aapl=DATA.holdings.find(h=>h.c==="AAPL"); const aaplV=aapl?val(aapl):0;
+  document.getElementById("fxShow").textContent=DATA.fx;
+  document.getElementById("sTotal").textContent="$"+fmt(total);
+  document.getElementById("sCount").textContent=DATA.holdings.length+" 檔持股";
+  document.getElementById("sDiv").textContent="$"+fmt(totDiv);
+  document.getElementById("sDivM").textContent="$"+fmt(totDiv/12);
+  const yld=totDiv/total*100;
+  const sy=document.getElementById("sYield"); sy.textContent=yld.toFixed(2)+"%";
+  sy.className="val "+(yld>=4.5?"green":yld>=3?"yellow":"red");
+  const ap=aaplV/total*100;
+  const sa=document.getElementById("sAapl"); sa.textContent=ap.toFixed(1)+"%";
+  sa.className="val "+(ap<=15?"green":ap<=20?"yellow":"red");
+
+  // 警示
+  let al="";
+  if(ap>15) al+=`<div class="alert red">🔴 <div><b>AAPL 集中度 ${ap.toFixed(1)}%</b>，超過 15% 上限約 ${fmt(aaplV-total*0.15)} 元，建議分批降階。</div></div>`;
+  if(yld<4.5) al+=`<div class="alert yellow">🟡 <div>整體殖利率 ${yld.toFixed(2)}%，未達 4.5% 目標；現階段為成長期可接受，43 歲前再拉高。</div></div>`;
+  const sellN=DATA.holdings.filter(h=>h.sell).length;
+  if(sellN) al+=`<div class="alert yellow">🟡 <div>尚有 <b>${sellN} 檔</b>待清倉零股，建議變現轉入 ETF。</div></div>`;
+  if(ap<=15&&yld>=4.5) al=`<div class="alert green">🟢 <div>配置健康！集中度與殖利率都達標。</div></div>`;
+  document.getElementById("alerts").innerHTML=al;
+
+  // 五大類 bar（含目標比例）
+  const cats={}; CAT_ORDER.forEach(c=>cats[c]=0);
+  DATA.holdings.forEach(h=>cats[h.cat]+=val(h));
+  let bars="",legend="";
+  CAT_ORDER.forEach(c=>{
+    const pct=cats[c]/total*100; const tgt=TARGET[c]||0;
+    if(cats[c]<=0 && tgt<=0) return;
+    const diff=pct-tgt;
+    const diffTxt = Math.abs(diff)<0.5 ? `<span style="color:var(--green)">✓ 達標</span>`
+      : diff>0 ? `<span style="color:var(--yellow)">超出 ${diff.toFixed(1)}%</span>`
+      : `<span style="color:var(--sub)">不足 ${(-diff).toFixed(1)}%</span>`;
+    bars+=`<div class="catRow">
+      <div class="catName"><span class="dot" style="background:${CAT_COLOR[c]}"></span>${CAT_LABEL[c]}</div>
+      <div class="catBarBig">
+        <i style="width:${Math.min(pct,100)}%;background:${CAT_COLOR[c]}"></i>
+        <span class="catBarPct">${pct.toFixed(1)}%</span>
+        <span class="catTgtLine" style="left:${Math.min(tgt,100)}%" title="目標 ${tgt}%"></span>
+      </div>
+      <div class="catSub">目標 ${tgt}% · ${diffTxt}</div>
+    </div>`;
+    legend+=`<span><i class="dot" style="background:${CAT_COLOR[c]}"></i>${c}</span>`;
+  });
+  document.getElementById("catBars").innerHTML=bars;
+  document.getElementById("catLegend").innerHTML=legend+`<span style="color:var(--sub)">｜ <b style="border-left:2px solid #1d1d1f;padding-left:4px">直線</b> = 目標比例</span>`;
+
+  // 現金流
+  const m=totDiv/12, pct=Math.min(m/30000*100,100);
+  document.getElementById("cfNow").textContent="$"+fmt(m);
+  document.getElementById("cfBar").style.width=pct.toFixed(1)+"%";
+  document.getElementById("cfBar").style.background = pct>=100?"var(--green)":"var(--blue)";
+  const gap=360000-totDiv;
+  document.getElementById("cfNote").textContent = gap>0
+    ? `距目標每月還差 ${fmt(gap/12)} 元（年 ${fmt(gap)}）。重點是拉高殖利率，非增加本金。`
+    : `已達標！每月配息超出目標 ${fmt(-gap/12)} 元。`;
+}
+
+// ===== 渲染：每月投入計畫（可編輯金額 + 增刪項目）=====
+function renderPlan(){
+  const renderList=(key,boxId,totId,color)=>{
+    const arr=DATA[key];
+    const tot=arr.reduce((a,x)=>a+x.amt,0);
+    let h="";
+    arr.forEach((x,i)=>{
+      const pct=tot?x.amt/tot*100:0;
+      h+=`<div class="barwrap">
+        <div class="top">
+          <span><input value="${x.n}" onchange="updPlan('${key}',${i},'n',this.value)" style="border:none;background:transparent;font-size:13px;width:140px"></span>
+          <span><input type="number" inputmode="decimal" value="${x.amt}" onchange="updPlan('${key}',${i},'amt',this.value)" style="width:88px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right"> · ${pct.toFixed(0)}% <a class="lnk" href="#" onclick="delPlan('${key}',${i});return false" style="color:var(--red)">✕</a></span>
+        </div>
+        <div class="bar"><i style="width:${pct}%;background:${color}"></i></div></div>`;
+    });
+    h+=`<button class="btn ghost" onclick="addPlan('${key}')" style="margin-top:8px;font-size:13px;padding:6px 12px">＋ 新增項目</button>`;
+    document.getElementById(boxId).innerHTML=h;
+    document.getElementById(totId).textContent="$"+fmt(tot);
+  };
+  renderList('planNow','planNowBox','planNowTotal','var(--blue)');
+  renderList('planSug','planSugBox','planSugTotal','var(--green)');
+}
+function updPlan(key,i,k,v){DATA[key][i][k]=(k==='amt')?(parseFloat(v)||0):v;save();renderPlan();}
+function addPlan(key){DATA[key].push({n:"新項目",amt:0});save();renderPlan();}
+function delPlan(key,i){DATA[key].splice(i,1);save();renderPlan();}
+
+// ===== 渲染：轉換追蹤 =====
+// ===== 渲染：超額個股降階追蹤（動態，依集中度門檻）=====
+function renderConv(){
+  const total=DATA.holdings.reduce((a,h)=>a+val(h),0);
+  const threshold=(DATA.concThreshold||15);
+  // 找出所有超過門檻的個股（排除 ETF 與保單，只看真正的單一個股）
+  // 規則：佔比 > 門檻% 就列入
+  const over=DATA.holdings
+    .map((h,i)=>({h,i,v:val(h),pct:val(h)/total*100}))
+    .filter(x=>x.pct>threshold)
+    .sort((a,b)=>b.pct-a.pct);
+
+  // 門檻輸入框同步
+  const ti=document.getElementById("concThreshold"); if(ti) ti.value=threshold;
+
+  const box=document.getElementById("convStocks");
+  if(!over.length){
+    box.innerHTML=`<div class="alert green" style="margin:0">🟢 <div>目前沒有任何個股超過 <b>${threshold}%</b> 集中度門檻，配置健康！</div></div>`;
+    return;
+  }
+
+  const labels=["第 1 期","第 2 期","第 3 期","第 4 期"];
+  const times=["2026 上半年","2026 下半年","2027 上半年","2027 下半年"];
+
+  // 確保 convDone 結構正確：{代號:[false,false,false,false]}
+  if(typeof DATA.convDone === 'object' && !Array.isArray(DATA.convDone)){
+    // 已是物件格式
+  } else {
+    // 舊版陣列 → 轉成物件格式（沿用給第一檔）
+    const old=DATA.convDone||[false,false,false,false];
+    DATA.convDone={};
+    if(over[0]) DATA.convDone[over[0].h.c]=old;
+  }
+
+  let html="";
+  over.forEach(({h,v,pct})=>{
+    const target=total*threshold/100;
+    const release=Math.max(v-target,0);
+    const per=release/4;
+    // 取得這檔的勾選狀態
+    if(!Array.isArray(DATA.convDone[h.c])) DATA.convDone[h.c]=[false,false,false,false];
+    const done=DATA.convDone[h.c];
+    const doneN=done.filter(Boolean).length;
+    const progPct=doneN/4*100;
+    const remain=release*(1-doneN/4);
+
+    let rows="";
+    done.forEach((d,i)=>{
+      rows+=`<tr>
+        <td class="center"><input type="checkbox" ${d?"checked":""} onchange="toggleConv('${h.c}',${i},this.checked)"></td>
+        <td class="l">${labels[i]}</td><td class="l">${times[i]}</td>
+        <td>${fmt(per)}</td>
+        <td class="l mini">定期執行，漲跌都照賣</td></tr>`;
+    });
+
+    html+=`<div style="margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:16px;font-weight:700">
+          ${h.n} <span class="pill">${h.c}</span>
+          <span class="tag" style="background:#ffeceb;color:#c4271d;margin-left:6px">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="mini">需釋出約 <b>${fmt(release)}</b>（每期約 ${fmt(per)}）</div>
+      </div>
+      <div class="barwrap">
+        <div class="top"><span>降階進度</span><span>${doneN}/4 期完成 · 還需釋出約 <b>${fmt(remain)}</b></span></div>
+        <div class="bar"><i style="width:${progPct}%;background:var(--yellow)"></i></div>
+      </div>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table>
+          <thead><tr><th class="center">完成</th><th class="l">期數</th><th class="l">預計時間</th><th>預計賣出金額</th><th class="l">備註</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  box.innerHTML=html;
+
+  // 零股清倉
+  const sells=DATA.holdings.filter(h=>h.cat==="待售");
+  const sellV=sells.reduce((a,h)=>a+val(h),0);
+  document.getElementById("sellBar").style.width=(sells.length?0:100)+"%";
+  document.getElementById("sellPctText").textContent=`剩 ${sells.length} 檔未清`;
+  document.getElementById("sellNote").innerHTML=sells.length
+    ? `目前還有 <b>${sells.length} 檔</b>待售零股，市值約 <b>${fmt(sellV)}</b>。從庫存表把賣掉的刪除，這裡會更新。`
+    : `🎉 零股已全部清倉完畢！`;
+}
+function toggleConv(code,i,v){
+  if(!DATA.convDone[code]) DATA.convDone[code]=[false,false,false,false];
+  DATA.convDone[code][i]=v;
+  save();renderConv();
+}
+function setThreshold(v){
+  DATA.concThreshold=Math.max(5,Math.min(50,parseFloat(v)||15));
+  save();renderConv();
+}
+
+// ===== 渲染：目標追蹤 =====
+function renderGoal(){
+  const totDiv=DATA.holdings.reduce((a,h)=>a+divOf(h),0);
+  const m=totDiv/12, rate=m/30000*100;
+  document.getElementById("goalNow").textContent="$"+fmt(m);
+  const gr=document.getElementById("goalRate"); gr.textContent=rate.toFixed(0)+"%";
+  gr.className="val "+(rate>=100?"green":rate>=70?"yellow":"red");
+  document.getElementById("goalGap").textContent="$"+fmt(Math.max(30000-m,0));
+  document.getElementById("goalBar").style.width=Math.min(rate,100)+"%";
+
+  const stages=[
+    {age:"39–43 歲",name:"成長累積期",now:true,desc:"拆 AAPL、零股 ETF 化，資產續長"},
+    {age:"43–45 歲",name:"半退休過渡期",now:false,desc:"打工每天 5hr，殖利率拉到 4.5%，現金流上線"},
+    {age:"50–55 歲",name:"考慮退休",now:false,desc:"評估國民年金 vs 續累積勞保年資"},
+    {age:"60 歲",name:"完全退休",now:false,desc:"勞退自提開領，核心配息打底＋衛星成長"}
+  ];
+  let h="";
+  stages.forEach(s=>{
+    h+=`<div style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)">
+      <div style="min-width:90px;font-weight:700;color:${s.now?'var(--blue)':'var(--ink)'}">${s.age}</div>
+      <div>
+        <div style="font-weight:600">${s.now?'📍 ':''}${s.name}${s.now?' <span class="tag" style="background:#e8f0ff;color:#0071e3">現在</span>':''}</div>
+        <div class="mini">${s.desc}</div>
+      </div></div>`;
+  });
+  document.getElementById("timeline").innerHTML=h;
+}
+
+// ===== 渲染：配息行事曆 =====
+let calSelMonth = (new Date()).getMonth()+1; // 目前選中的月份，預設本月
+// 算某檔「每次配息金額」(TWD) = 年配息總額 ÷ 配息次數
+function divPerTime(h){
+  const months=DATA.divMonths[h.c]||[];
+  if(!months.length) return 0;
+  const yearDiv=divOf(h); // 年配息總額(TWD)
+  return yearDiv/months.length;
+}
+// 算某月所有配息
+function divOfMonth(m){
+  let list=[];
+  DATA.holdings.forEach(h=>{
+    const months=DATA.divMonths[h.c]||[];
+    if(months.includes(m) && divOf(h)>0){
+      list.push({n:h.n, c:h.c, amt:divPerTime(h)});
+    }
+  });
+  return list;
+}
+function renderCal(){
+  const thisM=(new Date()).getMonth()+1;
+  // 本月焦點
+  const monthList=divOfMonth(thisM);
+  const monthAmt=monthList.reduce((a,x)=>a+x.amt,0);
+  const yearAmt=DATA.holdings.reduce((a,h)=>{
+    const months=DATA.divMonths[h.c]||[];
+    return a + (months.length? divOf(h):0);
+  },0);
+  document.getElementById("calThisMonth").textContent=thisM;
+  document.getElementById("calMonthCount").textContent=monthList.length+" 檔";
+  document.getElementById("calMonthAmt").textContent="$"+fmt(monthAmt);
+  document.getElementById("calYearAmt").textContent="$"+fmt(yearAmt);
+  document.getElementById("calMonthList").innerHTML = monthList.length
+    ? monthList.map(x=>`<div class="barwrap"><div class="top"><span>${x.n} <span class="mini">${x.c}</span></span><span><b>$${fmt(x.amt)}</b></span></div></div>`).join("")
+    : `<p class="mini">本月沒有設定配息的股票。到下方「設定各股配息月份」勾選即可。</p>`;
+
+  // 全年月曆
+  let grid="";
+  for(let m=1;m<=12;m++){
+    const list=divOfMonth(m);
+    const amt=list.reduce((a,x)=>a+x.amt,0);
+    const isThis=(m===thisM), isSel=(m===calSelMonth);
+    grid+=`<div onclick="selCalMonth(${m})" style="cursor:pointer;background:${isSel?'var(--blue)':'var(--bg)'};color:${isSel?'#fff':'var(--ink)'};border-radius:12px;padding:12px 8px;text-align:center;${isThis?'box-shadow:inset 0 0 0 2px var(--orange)':''}">
+      <div style="font-weight:700;font-size:15px">${m}月${isThis?' 📍':''}</div>
+      <div style="font-size:12px;margin-top:4px;color:${isSel?'#fff':'var(--blue)'}">${amt>0?'$'+fmt(amt):'—'}</div>
+      <div style="font-size:10px;color:${isSel?'#fff':'var(--sub)'}">${list.length?list.length+'檔':''}</div>
+    </div>`;
+  }
+  document.getElementById("calGrid").innerHTML=grid;
+
+  // 選中月明細
+  const sel=divOfMonth(calSelMonth);
+  const selAmt=sel.reduce((a,x)=>a+x.amt,0);
+  document.getElementById("calDetail").innerHTML=`
+    <div class="recobox"><h3>${calSelMonth}月 配息明細 · 共 $${fmt(selAmt)}</h3>
+    ${sel.length? `<table style="width:100%"><thead><tr><th class="l">名稱</th><th class="l">代號</th><th>預估金額</th></tr></thead><tbody>
+      ${sel.map(x=>`<tr><td class="l">${x.n}</td><td class="l">${x.c}</td><td>$${fmt(x.amt)}</td></tr>`).join("")}
+    </tbody></table>` : '<p class="mini">這個月沒有配息設定。</p>'}</div>`;
+
+  // 設定區（只列有配息的持股）
+  const divHoldings=DATA.holdings.filter(h=>divOf(h)>0);
+  let setup="";
+  divHoldings.forEach(h=>{
+    const months=DATA.divMonths[h.c]||[];
+    let checks="";
+    for(let m=1;m<=12;m++){
+      const on=months.includes(m);
+      checks+=`<label style="display:inline-flex;align-items:center;gap:2px;font-size:12px;margin-right:6px"><input type="checkbox" ${on?"checked":""} onchange="toggleDivMonth('${h.c}',${m},this.checked)">${m}</label>`;
+    }
+    setup+=`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">${h.n} <span class="mini">${h.c}</span> · 年配息約 $${fmt(divOf(h))} ${months.length?`<span class="mini">（每次約 $${fmt(divPerTime(h))}）</span>`:'<span class="mini" style="color:var(--orange)">尚未設定月份</span>'}</div>
+      <div>${checks}</div>
+    </div>`;
+  });
+  document.getElementById("calSetup").innerHTML=setup||'<p class="mini">目前沒有配息的持股。</p>';
+}
+function selCalMonth(m){calSelMonth=m;renderCal();}
+function toggleDivMonth(code,m,on){
+  if(!DATA.divMonths[code]) DATA.divMonths[code]=[];
+  const arr=DATA.divMonths[code];
+  if(on){ if(!arr.includes(m)) arr.push(m); }
+  else { DATA.divMonths[code]=arr.filter(x=>x!==m); }
+  save(); renderCal();
+}
+
+// ===== 渲染：消費統計 =====
+function renderSpend(){
+  const spendTot=DATA.spend.reduce((a,x)=>a+x.amt,0);
+  const {income,invest}=DATA.flow;
+  const remain=income-invest-spendTot;
+  document.getElementById("cfIncome").textContent="$"+fmt(income);
+  document.getElementById("cfInvest").textContent="$"+fmt(invest);
+  document.getElementById("cfSpend").textContent="$"+fmt(spendTot);
+  const cr=document.getElementById("cfRemain"); cr.textContent="$"+fmt(remain);
+  cr.className="val "+(remain>=0?"green":"red");
+  document.getElementById("inIncome").value=income;
+  document.getElementById("inInvest").value=invest;
+  const rate=income?(invest/income*100):0;
+  document.getElementById("cfRate").innerHTML=`💰 儲蓄率（投入÷收入）約 <b>${rate.toFixed(0)}%</b>；月結餘 ${remain>=0?'<b style="color:var(--green)">為正</b>，財務健康':'<b style="color:var(--red)">為負</b>，要留意'}。`;
+
+  let h="";
+  DATA.spend.forEach((x,i)=>{
+    const pct=spendTot?x.amt/spendTot*100:0;
+    h+=`<div class="barwrap">
+      <div class="top"><span><input value="${x.n}" onchange="updSpend(${i},'n',this.value)" style="border:none;background:transparent;font-size:13px;width:130px"></span>
+      <span><input type="number" inputmode="decimal" value="${x.amt}" onchange="updSpend(${i},'amt',this.value)" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:right"> · ${pct.toFixed(0)}% <a class="lnk" href="#" onclick="delSpend(${i});return false" style="color:var(--red)">✕</a></span></div>
+      <div class="bar"><i style="width:${pct}%;background:var(--purple,#af52de)"></i></div></div>`;
+  });
+  document.getElementById("spendBox").innerHTML=h;
+}
+function setFlow(k,v){DATA.flow[k]=parseFloat(v)||0;save();renderSpend();}
+function updSpend(i,k,v){DATA.spend[i][k]=(k==="amt")?(parseFloat(v)||0):v;save();renderSpend();}
+function addSpend(){DATA.spend.push({n:"🆕 新分類",amt:0});save();renderSpend();}
+function delSpend(i){DATA.spend.splice(i,1);save();renderSpend();}
+
+// ===== 渲染：銀行/現金帳戶 =====
+const BANK_TYPES=["活存","定存","借貸","其他"];
+function renderBank(){
+  const total=DATA.banks.reduce((a,b)=>a+(b.amt||0),0);
+  const fixed=DATA.banks.filter(b=>b.type==="定存").reduce((a,b)=>a+(b.amt||0),0);
+  document.getElementById("bankTotal").textContent="$"+fmt(total);
+  document.getElementById("bankFixed").textContent="$"+fmt(fixed);
+  let h="";
+  DATA.banks.forEach((b,i)=>{
+    const opts=BANK_TYPES.map(t=>`<option value="${t}" ${b.type===t?"selected":""}>${t}</option>`).join("");
+    h+=`<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+      <input value="${b.n}" onchange="updBank(${i},'n',this.value)" placeholder="帳戶名" style="width:120px;border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:13px">
+      <select onchange="updBank(${i},'type',this.value)" style="border:1px solid var(--line);border-radius:8px;padding:5px;font-size:12px">${opts}</select>
+      <input type="number" inputmode="decimal" value="${b.amt||0}" onchange="updBank(${i},'amt',this.value)" style="width:110px;border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:13px;text-align:right">
+      <input value="${b.note||''}" onchange="updBank(${i},'note',this.value)" placeholder="備註" style="flex:1;min-width:100px;border:none;background:transparent;font-size:12px;color:var(--sub)">
+      <a class="lnk" href="#" onclick="delBank(${i});return false" style="color:var(--red)">✕</a>
+    </div>`;
+  });
+  document.getElementById("bankBox").innerHTML=h||'<p class="mini">還沒有帳戶，點下方新增。</p>';
+}
+function updBank(i,k,v){DATA.banks[i][k]=(k==="amt")?(parseFloat(v)||0):v;save();renderBank();}
+function addBank(){DATA.banks.push({n:"新帳戶",type:"活存",amt:0,note:""});save();renderBank();}
+function delBank(i){if(confirm("刪除這個帳戶？")){DATA.banks.splice(i,1);save();renderBank();}}
+
+// ===== 渲染：建議與筆記 =====
+function renderNote(){
+  // 投資原則（可編輯、可刪）
+  const pBox=document.getElementById("principleBox");
+  pBox.innerHTML=DATA.principles.map((p,i)=>`
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">
+      <textarea onchange="updPrinciple(${i},this.value)" rows="1" style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;resize:vertical;line-height:1.5">${p}</textarea>
+      <a class="lnk" href="#" onclick="delPrinciple(${i});return false" style="color:var(--red);flex-shrink:0">✕</a>
+    </div>`).join("")
+    + `<button class="btn ghost" onclick="addPrinciple()" style="margin-top:10px;font-size:13px;padding:6px 12px">＋ 新增原則</button>`;
+
+  // 自由筆記（新到舊）
+  const nBox=document.getElementById("noteBox");
+  if(!DATA.notes.length){ nBox.innerHTML='<p class="mini">還沒有筆記，點上面「＋ 新增筆記」開始記錄。</p>'; return; }
+  nBox.innerHTML=DATA.notes.map((n,i)=>`
+    <div class="recobox" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <input value="${n.date}" onchange="updNote(${i},'date',this.value)" style="border:none;background:transparent;font-weight:700;font-size:13px;color:var(--blue);width:120px">
+        <a class="lnk" href="#" onclick="delNote(${i});return false" style="color:var(--red)">✕ 刪除</a>
+      </div>
+      <textarea onchange="updNote(${i},'text',this.value)" rows="2" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;resize:vertical;line-height:1.5">${n.text}</textarea>
+    </div>`).join("");
+}
+function updPrinciple(i,v){DATA.principles[i]=v;save();}
+function addPrinciple(){DATA.principles.push("新原則…");save();renderNote();}
+function delPrinciple(i){if(confirm("刪除這條原則？")){DATA.principles.splice(i,1);save();renderNote();}}
+function addNote(){
+  const today=new Date().toISOString().slice(0,10).replace(/-/g,"/");
+  DATA.notes.unshift({date:today,text:""});save();renderNote();switchTab("note");
+}
+function updNote(i,k,v){DATA.notes[i][k]=v;save();}
+function delNote(i){if(confirm("刪除這則筆記？")){DATA.notes.splice(i,1);save();renderNote();}}
+
+function renderAll(){renderInv();renderDash();renderPlan();renderConv();renderGoal();renderCal();renderSpend();renderBank();renderNote();renderDynamicReco();}
+
+// ===== 渲染：動態調整建議（依五大類目標差距）=====
+function renderDynamicReco(){
+  const box=document.getElementById("dynamicReco");
+  if(!box) return;
+  const total=DATA.holdings.reduce((a,h)=>a+val(h),0);
+  if(!total){box.innerHTML='<p class="mini">尚無資料</p>';return;}
+  const cats={}; CAT_ORDER.forEach(c=>cats[c]=0);
+  DATA.holdings.forEach(h=>{if(cats[h.cat]!==undefined)cats[h.cat]+=val(h);});
+  // 算每類的差距（diff = 目前% - 目標%；正=超標, 負=不足）
+  const diffs=CAT_ORDER.map(c=>{
+    const cur=cats[c]/total*100, tgt=TARGET[c]||0;
+    return {cat:c, cur, tgt, diff:cur-tgt, gap:Math.abs(cur-tgt)};
+  });
+  // 排序：最不足 2 + 最超標 2
+  const under=diffs.filter(x=>x.diff<-0.5).sort((a,b)=>a.diff-b.diff).slice(0,2);
+  const over =diffs.filter(x=>x.diff> 0.5).sort((a,b)=>b.diff-a.diff).slice(0,2);
+  if(!under.length && !over.length){
+    box.innerHTML='<div class="alert green" style="margin:0">🟢 <div>五大類配置都接近目標，狀況很健康！</div></div>';
+    return;
+  }
+  let h="";
+  // 最不足
+  under.forEach(x=>{
+    // 給該類舉幾檔範例（取庫存中該類前 2 檔）
+    const examples=DATA.holdings.filter(d=>d.cat===x.cat).slice(0,2).map(d=>d.c||d.n).join(' / ')||'—';
+    h+=`<div style="background:#fff;border-left:4px solid var(--green);padding:10px 14px;border-radius:8px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:14px">🔼 加碼 <span style="color:var(--green)">${CAT_LABEL[x.cat]}</span></div>
+      <div class="mini" style="margin-top:3px">目前 ${x.cur.toFixed(1)}% · 目標 ${x.tgt}% · <b style="color:var(--green)">不足 ${x.gap.toFixed(1)}%</b></div>
+      <div class="mini" style="color:var(--sub);margin-top:3px">建議優先加碼此類（範例：${examples}）</div>
+    </div>`;
+  });
+  // 最超標
+  over.forEach(x=>{
+    const examples=DATA.holdings.filter(d=>d.cat===x.cat).slice(0,2).map(d=>d.c||d.n).join(' / ')||'—';
+    h+=`<div style="background:#fff;border-left:4px solid var(--yellow);padding:10px 14px;border-radius:8px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:14px">🔽 減碼/暫停 <span style="color:var(--yellow)">${CAT_LABEL[x.cat]}</span></div>
+      <div class="mini" style="margin-top:3px">目前 ${x.cur.toFixed(1)}% · 目標 ${x.tgt}% · <b style="color:var(--yellow)">超出 ${x.gap.toFixed(1)}%</b></div>
+      <div class="mini" style="color:var(--sub);margin-top:3px">建議暫停加碼此類，或定期釋出（範例：${examples}）</div>
+    </div>`;
+  });
+  box.innerHTML=h;
+}
+
+// ===== Tab 切換 =====
+// ===== 兩層分組選單 =====
+const GROUPS = [
+  {id:"asset", label:"🌍 資產", pages:[
+    {p:"dash", label:"📊 現況儀表板"},
+    {p:"inv",  label:"📋 庫存表"},
+    {p:"conv", label:"🔄 轉換追蹤"},
+    {p:"goal", label:"📈 目標追蹤"}
+  ]},
+  {id:"flow", label:"🌊 現金流", pages:[
+    {p:"plan", label:"💰 每月投入"},
+    {p:"cal",  label:"📅 配息行事曆"},
+    {p:"spend",label:"💳 消費統計"}
+  ]},
+  {id:"memo", label:"📝 備忘", pages:[
+    {p:"note", label:"📝 建議與筆記"}
+  ]}
+];
+let curGroup = "asset";
+let curPage = "dash";
+
+function renderTabs(){
+  // 第一層
+  document.getElementById("groupTabs").innerHTML = GROUPS.map(g=>
+    `<div class="gtab ${g.id===curGroup?'active':''}" onclick="selGroup('${g.id}')">${g.label}</div>`
+  ).join("");
+  // 第二層（只顯示目前大類的小 tab）
+  const g = GROUPS.find(x=>x.id===curGroup);
+  document.getElementById("subTabs").innerHTML = g.pages.map(pg=>
+    `<div class="tab ${pg.p===curPage?'active':''}" onclick="switchTab('${pg.p}')">${pg.label}</div>`
+  ).join("");
+}
+function selGroup(gid){
+  curGroup = gid;
+  const g = GROUPS.find(x=>x.id===gid);
+  // 切大類時，自動跳到該類第一個分頁
+  switchTab(g.pages[0].p);
+}
+function switchTab(p){
+  curPage = p;
+  // 確保 curGroup 跟著 p 走（避免不同步）
+  const g = GROUPS.find(x=>x.pages.some(pg=>pg.p===p));
+  if(g) curGroup = g.id;
+  document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id===p));
+  renderTabs();
+}
+renderTabs();
+
+// ===== 匯出/匯入/還原 =====
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(DATA,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="財務總表備份_"+new Date().toISOString().slice(0,10)+".json";
+  a.click();
+}
+function importJSON(e){
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{DATA=JSON.parse(ev.target.result);save();renderAll();setStatus("📥 已從檔案匯入");alert("匯入成功！");}catch(err){alert("檔案格式錯誤");}};
+  r.readAsText(f);
+}
+function resetData(){if(confirm("還原為空白範例？目前的修改會消失（建議先匯出備份）。")){DATA=JSON.parse(JSON.stringify(DEFAULT));save();renderAll();setStatus("↺ 已還原為空白範例");}}
+
+// ===== 從外部 data.json 載入 =====
+// 邏輯：第一次開、或按「🔄 重新載入」時，去抓同資料夾的 data.json
+// 抓得到 → 用它；抓不到 → 用 localStorage 或 DEFAULT
+function setStatus(msg){
+  const el=document.getElementById("dataStatus");
+  if(el) el.textContent=msg;
+}
+async function loadFromDataJson(silent){
+  try{
+    const r=await fetch("data.json",{cache:"no-store"});
+    if(!r.ok) throw new Error("找不到 data.json");
+    const d=await r.json();
+    DATA=d;
+    save();
+    renderAll();
+    setStatus("✅ 已載入 data.json（"+(d.holdings?.length||0)+" 檔持股）");
+    if(!silent) alert("✅ 已成功重新載入 data.json");
+    return true;
+  }catch(e){
+    if(!silent) alert("⚠️ 找不到 data.json，請確認檔案在同一資料夾。\n\n錯誤訊息："+e.message);
+    setStatus("⚠️ 未載入 data.json（使用瀏覽器記憶體資料）");
+    return false;
+  }
+}
+function reloadFromFile(){
+  if(confirm("重新從 data.json 載入會覆蓋目前資料，繼續嗎？（建議先匯出備份）")){
+    loadFromDataJson(false);
+  }
+}
+
+// ===== 啟動 =====
+// 1) 先用 localStorage 或 DEFAULT 顯示（避免空白等待）
+renderAll();
+// 2) 第一次開（沒有 localStorage 紀錄）→ 自動嘗試載入 data.json
+if(!localStorage.getItem("finData")){
+  loadFromDataJson(true);
+}else{
+  setStatus("💾 使用瀏覽器記憶體資料｜按「🔄 重新載入 data.json」可同步檔案");
+}
+</script>
+</body>
+</html>
