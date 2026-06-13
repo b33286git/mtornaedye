@@ -106,6 +106,17 @@
   .addrow{margin-top:12px}
   #addForm input,#addForm select{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
   .footer{text-align:center;color:var(--sub);font-size:12px;margin-top:30px}
+  /* 🔄 股價自動更新：漲跌色標 + 失敗列灰 */
+  td.priceUp{background:rgba(52,199,89,.10)}
+  td.priceDown{background:rgba(255,59,48,.10)}
+  tr.priceFail td{background:#f5f5f7 !important;color:var(--sub);opacity:.7}
+  tr.priceFail td:first-child::before{content:"🖊 ";font-size:11px;opacity:.7}
+  .manualBox{background:#fff8e6;border:1px solid #f0d875;border-radius:14px;padding:16px;margin-top:16px}
+  .manualBox h3{font-size:14px;font-weight:700;margin-bottom:6px}
+  .manualBox .grid4{display:grid;grid-template-columns:1.6fr .8fr 1fr 1fr;gap:8px;align-items:center}
+  .manualBox .grid4>div,.manualBox .grid4>input{font-size:13px}
+  .manualBox input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:right;font-family:inherit}
+  @media(max-width:520px){.manualBox .grid4{grid-template-columns:1.5fr 1fr;gap:6px}.manualBox .grid4 .hideMob{display:none}}
   details{margin-top:10px}
   summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--blue)}
   .recobox{background:var(--bg);border-radius:14px;padding:16px;margin-bottom:12px}
@@ -125,12 +136,15 @@
   </header>
 
   <div class="toolbar">
-    <button class="btn" onclick="exportJSON()">⬇️ 匯出 JSON 備份</button>
+    <button class="btn" onclick="updatePrices()" id="btnUpdate">🔄 更新股價</button>
+    <button class="btn ghost" onclick="revertPrices()" id="btnRevert" style="display:none">↶ 還原</button>
+    <button class="btn ghost" onclick="exportJSON()">⬇️ 匯出 JSON 備份</button>
     <button class="btn ghost" onclick="document.getElementById('imp').click()">⬆️ 匯入資料</button>
     <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(event)">
     <button class="btn ghost" onclick="reloadFromFile()">🔄 重新載入 data.json</button>
     <button class="btn ghost" onclick="resetData()">↺ 還原為空</button>
   </div>
+  <div id="priceStatus" style="text-align:center;font-size:12px;color:var(--sub);margin:-6px 0 4px"></div>
   <div id="dataStatus" style="text-align:center;font-size:12px;color:var(--sub);margin:-6px 0 10px"></div>
 
   <div class="groupTabs" id="groupTabs"></div>
@@ -203,6 +217,7 @@
           </div>
         </div>
       </div>
+      <div id="manualUpdateBox" style="display:none"></div>
       <p class="mini" style="margin-top:10px">💡 美股／美元計價基金，把「幣別」選 USD，系統會自動以匯率換算台幣。</p>
       <details>
         <summary>⚙️ 進階設定（匯率）</summary>
@@ -511,6 +526,7 @@ function renderInv(){
       const pl=plOf(h), c=costVal(h);
       const plpct=(c&&c>0)?(pl/c*100):null;
       const tr=document.createElement("tr");
+      if(h._priceFail) tr.className="priceFail";
       tr.innerHTML=cols.map(col=>renderCell(col,h,i,v,yld,pl,plpct,total)).join("");
       body.appendChild(tr);
     });
@@ -544,7 +560,10 @@ function renderCell(col,h,i,v,yld,pl,plpct,total){
   switch(col.key){
     case "n": return ro?`<td class="l">${h.n}</td>`:`<td class="l"><input class="name" value="${h.n}" onchange="upd(${i},'n',this.value,1)"></td>`;
     case "c": return ro?`<td class="l">${h.c}</td>`:`<td class="l"><input class="name" style="width:60px" value="${h.c}" onchange="upd(${i},'c',this.value,1)"></td>`;
-    case "p": return ro?`<td>${h.p}</td>`:`<td><input type="number" inputmode="decimal" step="0.01" value="${h.p}" onchange="upd(${i},'p',this.value)"></td>`;
+    case "p": {
+      const cls = h._priceTrend==="up" ? " class=\"priceUp\"" : h._priceTrend==="down" ? " class=\"priceDown\"" : "";
+      return ro?`<td${cls}>${h.p}</td>`:`<td${cls}><input type="number" inputmode="decimal" step="0.01" value="${h.p}" onchange="upd(${i},'p',this.value)"></td>`;
+    }
     case "cur": return `<td><select onchange="upd(${i},'cur',this.value,1)"><option value="TWD" ${h.cur==="TWD"?"selected":""}>TWD</option><option value="USD" ${h.cur==="USD"?"selected":""}>USD</option></select></td>`;
     case "s": return ro?`<td>${h.s}</td>`:`<td><input type="number" inputmode="decimal" step="0.0001" value="${h.s}" onchange="upd(${i},'s',this.value)"></td>`;
     case "cost": return ro?`<td>${h.cost?h.cost:"—"}</td>`:`<td><input type="number" inputmode="decimal" step="0.01" value="${h.cost||""}" placeholder="—" onchange="upd(${i},'cost',this.value)"></td>`;
@@ -1172,9 +1191,164 @@ function reloadFromFile(){
   }
 }
 
-// ===== 啟動 =====
+// ============================================
+// 📈 股價自動更新（Cloudflare Worker + Yahoo Finance）
+// ============================================
+const PRICE_API = "https://stock-price.b33286.workers.dev/";
+const PRICE_CACHE_KEY = "finPriceMeta"; // 存上次更新時間
+let PRICE_BACKUP = null; // 還原用備份
+
+// 把持股代號轉成 Yahoo 格式
+// - 純數字（如 2330、00937B）→ 加 .TW（上櫃會自動 fallback .TWO）
+// - 含字母（如 AAPL、BRK.B）→ BRK.B 改成 BRK-B
+// - 沒代號（n="-"）或代號是 "-" → 跳過（保單、定存）
+function toYahooSymbol(c){
+  if(!c||c==="-") return null;
+  // 已含 . 或 -，當美股處理（BRK.B → BRK-B）
+  if(/^[A-Za-z]/.test(c)){
+    return c.replace(/\./g,"-");
+  }
+  // 純數字或數字+字母（如 00937B、006208）→ 台股
+  return c + ".TW";
+}
+
+function setPriceStatus(msg){
+  const el=document.getElementById("priceStatus");
+  if(el) el.textContent=msg;
+}
+
+async function updatePrices(){
+  const btn=document.getElementById("btnUpdate");
+  btn.disabled=true;
+  const orig=btn.textContent;
+  btn.textContent="⏳ 抓取中...";
+  setPriceStatus("正在連線 Cloudflare Worker...");
+
+  try{
+    // 1) 收集要更新的代號
+    const map={}; // sym -> [holdings index list]
+    DATA.holdings.forEach((h,i)=>{
+      const sym=toYahooSymbol(h.c);
+      if(!sym) return;
+      if(!map[sym]) map[sym]=[];
+      map[sym].push(i);
+    });
+    const syms=Object.keys(map);
+    if(!syms.length){alert("沒有可更新的代號");return;}
+
+    // 2) 備份目前股價（給還原用）
+    PRICE_BACKUP=DATA.holdings.map(h=>h.p);
+
+    // 3) 呼叫 Worker
+    const url=PRICE_API+"?symbols="+encodeURIComponent(syms.join(","));
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("Worker 回應失敗 "+r.status);
+    const j=await r.json();
+    if(j.error) throw new Error(j.error);
+
+    // 4) 套用價格 + 標記漲跌/失敗
+    let okCount=0, failCount=0;
+    const failList=[];
+    DATA.holdings.forEach((h,i)=>{
+      const sym=toYahooSymbol(h.c);
+      if(!sym){ delete h._priceTrend; delete h._priceFail; return; }
+      const q=j.data[sym];
+      if(q && typeof q.price==="number"){
+        // 防呆：超過 ±30% 跳警告
+        const oldP=h.p;
+        const diff=Math.abs((q.price-oldP)/oldP);
+        if(oldP>0 && diff>0.3){
+          if(!confirm(`⚠️ ${h.n}(${h.c}) 價差過大\n原價：${oldP}\n新價：${q.price}\n是否套用？`)){
+            h._priceFail=true; failCount++; failList.push(h); return;
+          }
+        }
+        h.p=q.price;
+        h._priceTrend = q.change>0 ? "up" : q.change<0 ? "down" : null;
+        delete h._priceFail;
+        okCount++;
+      }else{
+        h._priceFail=true;
+        delete h._priceTrend;
+        failCount++;
+        failList.push(h);
+      }
+    });
+
+    save();
+    localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify({
+      time: Date.now(),
+      cached: j.cached || false
+    }));
+    renderAll();
+    renderManualBox(failList);
+    document.getElementById("btnRevert").style.display="";
+    setPriceStatus(`✅ 更新完成｜成功 ${okCount} 檔｜需手動 ${failCount} 檔｜${j.cached?"⚡ 用快取":"🌐 即時"} · ${new Date().toLocaleString("zh-TW",{hour12:false})}`);
+  }catch(err){
+    setPriceStatus("⚠️ 更新失敗："+err.message+"（沿用原本價格）");
+    alert("⚠️ 股價更新失敗\n\n"+err.message+"\n\n網路或 Worker 可能異常，原本的股價保持不變。");
+  }finally{
+    btn.disabled=false;
+    btn.textContent=orig;
+  }
+}
+
+function revertPrices(){
+  if(!PRICE_BACKUP) return;
+  if(!confirm("還原成「更新前」的股價？")) return;
+  DATA.holdings.forEach((h,i)=>{
+    if(PRICE_BACKUP[i]!==undefined) h.p=PRICE_BACKUP[i];
+    delete h._priceTrend;
+    delete h._priceFail;
+  });
+  save();
+  renderAll();
+  document.getElementById("manualUpdateBox").style.display="none";
+  document.getElementById("btnRevert").style.display="none";
+  setPriceStatus("↶ 已還原成更新前的股價");
+  PRICE_BACKUP=null;
+}
+
+// 抓不到的清單：顯示在庫存表下方，方便一次手動更新
+function renderManualBox(failList){
+  const box=document.getElementById("manualUpdateBox");
+  if(!box) return;
+  if(!failList || !failList.length){box.style.display="none";return;}
+  box.style.display="";
+  box.className="manualBox";
+  let html=`<h3>🖊 需手動更新（${failList.length} 檔）</h3>
+    <p class="mini" style="margin-bottom:10px">Yahoo Finance 未收錄這些股票（多為上櫃/興櫃小型股），請直接輸入最新股價，會即時存檔。</p>
+    <div class="grid4" style="font-weight:600;color:var(--sub);font-size:12px;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px">
+      <div>名稱</div><div>代號</div><div>目前價格</div><div class="hideMob">分類</div>
+    </div>`;
+  failList.forEach(h=>{
+    const i=DATA.holdings.indexOf(h);
+    html+=`<div class="grid4" style="padding:6px 0;border-bottom:1px solid #f0e6c0">
+      <div>${h.n}</div>
+      <div style="color:var(--sub)">${h.c}</div>
+      <div><input type="number" inputmode="decimal" step="0.01" value="${h.p}" onchange="upd(${i},'p',this.value)" style="width:100%;max-width:120px"></div>
+      <div class="hideMob" style="color:var(--sub);font-size:12px">${h.cat}</div>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+
+// 啟動時顯示上次更新時間
+function showLastUpdate(){
+  try{
+    const m=localStorage.getItem(PRICE_CACHE_KEY);
+    if(!m) return;
+    const meta=JSON.parse(m);
+    const ago=Math.round((Date.now()-meta.time)/60000);
+    const txt = ago<1 ? "剛才" : ago<60 ? `${ago} 分鐘前` : ago<1440 ? `${Math.round(ago/60)} 小時前` : `${Math.round(ago/1440)} 天前`;
+    setPriceStatus(`💡 上次股價更新：${txt}`);
+  }catch(e){}
+}
+
+
 // 1) 先用 localStorage 或 DEFAULT 顯示（避免空白等待）
 renderAll();
+// 顯示上次股價更新時間
+showLastUpdate();
 // 2) 第一次開（沒有 localStorage 紀錄）→ 自動嘗試載入 data.json
 if(!localStorage.getItem("finData")){
   loadFromDataJson(true);
